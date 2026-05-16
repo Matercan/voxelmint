@@ -9,6 +9,15 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    mod.addCSourceFiles(.{
+        .files = &.{ "src/wayland/client.c", "src/wayland/draw.c", "src/wayland/protocol.c" },
+        .flags = &.{"-Wall"},
+    });
+
+    mod.addIncludePath(b.path("src/wayland/"));
+    mod.linkSystemLibrary("wayland-client", .{});
+    mod.link_libc = true;
+
     const exe = b.addExecutable(.{
         .name = "voxelmint",
         .root_module = b.createModule(.{
@@ -21,7 +30,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    exe.linkLibCpp();
     b.installArtifact(exe);
 
     const run_step = b.step("run", "Run the app");

@@ -9,5 +9,8 @@ pkgs.mkShell {
     gcc
     clang
     libclang
+    wayland
+    pkg-config
   ];
+  WAYLAND_PROTOCOLS_DIR = "${pkgs.wayland-protocols}/share/wayland-protocols";
 }
