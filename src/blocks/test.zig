@@ -19,21 +19,15 @@ pub const TestBlock = struct {
     fn properties(self: *const anyopaque) base.BlockProperties {
         const block: *const TestBlock = @ptrCast(@alignCast(self));
 
-        const texture = fs.cwd().readFileAlloc(std.heap.page_allocator, block.texture_file, std.math.maxInt(usize)) catch |err| {
-            std.debug.panic("Failed to read texture: {}", .{err});
-        };
-
         return .{
             .position = .{ block.x, block.y, block.z },
             .rotation = .{ 0, 0, 0 },
-            .texture = texture,
+            .texture = "dirt.gtex",
         };
     }
 
     fn update(self: *anyopaque) !void {
-        const block: *TestBlock = @ptrCast(@alignCast(self));
-        std.debug.print("UPDATE YAAAY\n", .{});
-        block.x += 1;
+        _ = self;
     }
 
     fn destroy(self: *anyopaque, allocator: std.mem.Allocator) !void {
@@ -48,7 +42,6 @@ pub const TestBlock = struct {
 
     pub fn init(pos: @Vector(3, u16), texture: ?[]const u8) !TestBlock {
         const text = texture.?;
-
         return .{ .x = pos[0], .y = pos[1], .z = pos[2], .texture_file = text };
     }
 };

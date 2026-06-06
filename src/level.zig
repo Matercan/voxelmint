@@ -1,10 +1,15 @@
 const man = @import("manager.zig");
 const std = @import("std");
+const gpu = @import("rendering/rendering.zig");
 
 const Function = @import("block.zig").BlockFunctions;
 const Block = man.Block;
 const Manager = man.Manager;
-const Renderer = @import("renderer.zig").Renderer;
+const Renderer = @import("rendering/renderer.zig").Renderer;
+
+pub const LevelError = error{
+    VulkanFailed,
+};
 
 pub const Level = struct {
     manager: Manager,
@@ -16,17 +21,12 @@ pub const Level = struct {
     }
 
     pub fn init(gpa: std.mem.Allocator, blocks: []const *Block, functions: []const Function) !@This() {
-        std.debug.print("Blocks ptr: {*}\n Functions ptr: {*}\n", .{blocks, functions});
-
         var manager: Manager = try .init(gpa, blocks.len);
         var initial_props = try manager.get_properties();
-        defer initial_props.deinit(gpa);
-        const renderer: Renderer = .init(initial_props.items);
+        defer initial_props.deinit(manager.allocator);
+        const renderer: Renderer = try .init(initial_props.items);
 
         for (blocks, functions) |*block, *function| {
-            std.debug.print("block ptr: {*}\n", .{block});
-            std.debug.print("functions ptr: {*}\n", .{function});
-            std.debug.print("update: {*}, destroy: {*}, properties: {*}\n", .{function.update, function.destroy, function.properties});
             try manager.append(block.*, function.*);
         }
 
@@ -42,12 +42,14 @@ pub const Level = struct {
     }
 
     pub fn tick(self: *Level) !void {
+        var thread = try std.Thread.spawn(.{}, gpu.Application.tickApplication, .{self.renderer.app});
+
         var properties = try self.manager.get_properties();
-        self.renderer.change_blocks(properties.items);
-        var thread = try std.Thread.spawn(.{}, Renderer.render, .{&self.renderer});
+        defer properties.deinit(self.manager.allocator);
+        try self.renderer.change_blocks(properties.items);
         try self.manager.update_all();
+
         thread.join();
-        properties.deinit(self.allocator);
     }
 
     pub fn run(self: *Level) !void {

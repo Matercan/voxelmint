@@ -38,13 +38,10 @@ pub const Manager = struct {
     }
 
     pub fn get_properties(self: *const Manager) !ArrayList(block.BlockProperties) {
-        var properties: ArrayList(block.BlockProperties) = .empty;
+        var properties: std.ArrayList(block.BlockProperties) = try .initCapacity(self.allocator, self.blocks.items.len);
         errdefer properties.deinit(self.allocator);
 
         for (self.buffer.items, self.blocks.items) |blk, item| {
-            std.debug.print("block ptr: {*}\n", .{item});
-
-            std.debug.print("Finaly hope!", .{});
             const prop = blk.properties(item);
             try properties.append(self.allocator, prop);
         }

@@ -1,0 +1,25 @@
+BasedOnStyle: LLVM
+
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+
+ColumnLimit: 100
+
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+AlignOperands: Align
+
+ContinuationIndentWidth: 2
+IndentCaseLabels: true
+IndentPPDirectives: None
+
+AllowShortIfStatementsOnASingleLine: true 
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+SortIncludes: Never

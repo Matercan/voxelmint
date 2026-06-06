@@ -1,9 +1,9 @@
 pub const manager = @import("manager.zig");
 pub const block = @import("block.zig");
-pub const renderer = @import("renderer.zig");
+pub const renderer = @import("rendering/renderer.zig");
 pub const level = @import("level.zig");
 pub const blocks = @import("blocks/test.zig");
-pub const display = @import("wayland/display.zig");
+pub const vulkan = @import("rendering/rendering.zig");
 
 test "level" {
     const std = @import("std");
@@ -19,17 +19,15 @@ test "level" {
     }
 
     const blk = try allocator.create(TestBlock);
-    blk.* = try TestBlock.init(.{ 0, 0, 0 }, "image.png");
+    blk.* = try TestBlock.init(.{ 0, 0, 0 }, "textures/image.png");
     const func = blk.functions();
-
-    std.debug.print("Suck it weirdo\n", .{});
 
     var blks = [_]*manager.Block{@ptrCast(blk)};
     var fns = [_]block.BlockFunctions{func};
 
     var lvl: level.Level = try .init(allocator, &blks, &fns);
-    for (0..21) |_|{
-        std.debug.print("Tick\n", .{});
+    for (0..50000) |i| {
+        std.debug.print("i: {}\n", .{i});
         try lvl.tick();
     }
 
