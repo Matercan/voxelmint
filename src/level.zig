@@ -42,7 +42,7 @@ pub const Level = struct {
     }
 
     pub fn tick(self: *Level) !void {
-        var thread = try std.Thread.spawn(.{}, gpu.Application.tickApplication, .{self.renderer.app});
+        var thread = try std.Thread.spawn(.{}, Renderer.render, .{&self.renderer});
 
         var properties = try self.manager.get_properties();
         defer properties.deinit(self.manager.allocator);

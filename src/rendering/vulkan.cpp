@@ -46,9 +46,9 @@ import vulkan_hpp;
 
 #include "vertex.hpp"
 
-extern "C" const uint32_t WIDTH                = 800;
-extern "C" const uint32_t HEIGHT               = 800;
-extern "C" constexpr int  MAX_FRAMES_IN_FLIGHT = 2;
+extern "C" constexpr uint32_t WIDTH                = 800;
+extern "C" constexpr uint32_t HEIGHT               = 800;
+extern "C" constexpr int      MAX_FRAMES_IN_FLIGHT = 2;
 
 const std::vector<char const*> validationLayers        = {"VK_LAYER_KHRONOS_validation"};
 std::vector<const char*>       requiredDeviceExtension = {vk::KHRSwapchainExtensionName};
@@ -62,6 +62,7 @@ constexpr bool enableValidationLayers = true;
 struct MeshUploadJob {
   std::vector<Vertex>   vertices;
   std::vector<uint32_t> indices;
+  bool                  reset = false;
 };
 
 constexpr std::vector<char> readFile(const std::string& filename) {
@@ -174,10 +175,11 @@ public:
     cleanup();
   }
 
-  void setVertexes(std::vector<Vertex> vertices, std::vector<uint32_t> indices) {
+  void pushVertices(std::vector<Vertex> vertices, std::vector<uint32_t> indices, bool reset) {
     std::lock_guard<std::mutex> lock(uploadMutex);
 
-    pendingUploads.push({.vertices = std::move(vertices), .indices = std::move(indices)});
+    pendingUploads.push(
+      {.vertices = std::move(vertices), .indices = std::move(indices), .reset = reset});
   }
 
 private:
@@ -275,6 +277,12 @@ private:
       throw std::runtime_error("Failed to wait for fence");
     }
 
+    processPendingUploads();
+    if (!drawingDataAvailable) {
+      frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+      return;
+    }
+
     auto [result, imageIndex] = swapChain.acquireNextImage(
       std::numeric_limits<uint64_t>::max(), presentCompleteSemaphores[frameIndex], nullptr);
 
@@ -289,13 +297,6 @@ private:
 
     device.resetFences(**drawFence);
     updateUniformBuffer(frameIndex);
-    processPendingUploads();
-
-    if (!drawingDataAvailable) {
-      graphicsQueue.submit(vk::SubmitInfo{}, *drawFence);
-      frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
-      return;
-    }
 
     commandBuffers[frameIndex].reset();
     recordCommandBuffer(imageIndex);
@@ -347,20 +348,32 @@ private:
   void processPendingUploads() {
     std::lock_guard lock(uploadMutex);
 
-    if (pendingUploads.empty()) {
-      return;
+    if (pendingUploads.empty()) return;
+
+    std::vector<Vertex>                  vertices{};
+    std::vector<uint32_t>                indices{};
+    std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+    while (!pendingUploads.empty()) {
+      MeshUploadJob job = std::move(pendingUploads.front());
+      pendingUploads.pop();
+
+      if (job.reset) {
+        vertices.clear();
+        indices.clear();
+        uniqueVertices.clear();
+      }
+
+      vertices.insert(vertices.end(), job.vertices.begin(), job.vertices.end());
+      indices.insert(indices.end(), job.indices.begin(), job.indices.end());
     }
 
-    MeshUploadJob job = std::move(pendingUploads.front());
-    pendingUploads.pop();
+    if (vertices.empty()) return;
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-      memcpy(vertexBuffersMapped[i], job.vertices.data(),
-             job.vertices.size() * sizeof(job.vertices[0]));
-      memcpy(indexBuffersMapped[i], job.indices.data(),
-             job.indices.size() * sizeof(job.indices[0]));
-
-      currentIndexCount[i] = job.indices.size();
+      memcpy(vertexBuffersMapped[i], vertices.data(), vertices.size() * sizeof(vertices[0]));
+      memcpy(indexBuffersMapped[i], indices.data(), indices.size() * sizeof(indices[0]));
+      currentIndexCount[i] = static_cast<uint32_t>(indices.size());
     }
 
     drawingDataAvailable = true;
@@ -1191,6 +1204,13 @@ void setVertices(Application* app, Vertex* vertices, size_t vert_len, uint32_t* 
                  size_t ind_len) {
   std::vector<Vertex>   verts(vertices, vertices + vert_len);
   std::vector<uint32_t> inds(indices, indices + ind_len);
-  app->setVertexes(std::move(verts), std::move(inds));
+  app->pushVertices(std::move(verts), std::move(inds), true);
+}
+
+void pushVertices(Application* app, Vertex* vertices, size_t vert_len, uint32_t* indices,
+                  size_t ind_len) {
+  std::vector<Vertex>   verts(vertices, vertices + vert_len);
+  std::vector<uint32_t> inds(indices, indices + ind_len);
+  app->pushVertices(std::move(verts), std::move(inds), false);
 }
 }

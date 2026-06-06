@@ -7,6 +7,7 @@ pub const Renderer = struct {
     current_blocks: []const Block,
     arena: std.heap.ArenaAllocator,
     app: *gpu.Application,
+    mutex: std.Thread.Mutex,
 
     pub fn init(blocks: []const Block) !Renderer {
         const arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -17,6 +18,7 @@ pub const Renderer = struct {
             .current_blocks = blocks,
             .arena = arena,
             .app = app,
+            .mutex = std.Thread.Mutex{},
         };
     }
 
@@ -25,19 +27,22 @@ pub const Renderer = struct {
         self.arena.deinit();
     }
 
-    pub fn change_blocks(self: *Renderer, blocks: []const Block) !void {
-        self.current_blocks = blocks;
-
+    pub fn render(self: *Renderer) !void {
         _ = self.arena.reset(.retain_capacity);
         const allocator = self.arena.allocator();
 
-        var verticesList = try std.ArrayList(block.Vertex).initCapacity(allocator, blocks.len * 24);
-        var indicesList = try std.ArrayList(u32).initCapacity(allocator, blocks.len * 36);
+        // copy current_blocks under the lock, then release
+        self.mutex.lock();
+        const blocks = self.current_blocks;
+        self.mutex.unlock();
 
-        defer indicesList.deinit(allocator);
+        var verticesList = try std.ArrayList(block.Vertex).initCapacity(allocator, blocks.len * 24);
         defer verticesList.deinit(allocator);
 
-        for (self.current_blocks, 0..) |blk, i| {
+        var indicesList = try std.ArrayList(u32).initCapacity(allocator, blocks.len * 36);
+        defer indicesList.deinit(allocator);
+
+        for (blocks, 0..) |blk, i| {
             const vertices = block.convertBlockToVertexes(blk);
             try verticesList.appendSlice(allocator, &vertices);
 
@@ -53,7 +58,13 @@ pub const Renderer = struct {
             indicesList.items.ptr,
             indicesList.items.len,
         );
+
+        self.app.tickApplication();
     }
 
-    pub fn render(_: *Renderer) !void {}
+    pub fn change_blocks(self: *Renderer, blocks: []const Block) !void {
+        self.mutex.lock();
+        self.current_blocks = blocks;
+        self.mutex.unlock();
+    }
 };
