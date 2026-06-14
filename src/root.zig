@@ -4,6 +4,7 @@ pub const renderer = @import("rendering/renderer.zig");
 pub const level = @import("level.zig");
 pub const blocks = @import("blocks/test.zig");
 pub const vulkan = @import("rendering/rendering.zig");
+pub const tex = @import("rendering/textures.zig");
 
 test "level" {
     const std = @import("std");

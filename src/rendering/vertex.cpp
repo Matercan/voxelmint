@@ -9,7 +9,7 @@
 vk::VertexInputBindingDescription getVertexBindingDescription() {
   return {0, sizeof(Vertex), vk::VertexInputRate::eVertex};
 }
-std::array<vk::VertexInputAttributeDescription, 3> getVertexAttributeDescriptions() {
+std::array<vk::VertexInputAttributeDescription, 4> getVertexAttributeDescriptions() {
   return Vertex::getAttributeDescriptions();
 }
 

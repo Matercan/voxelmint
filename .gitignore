@@ -1,7 +1,8 @@
-# ---> Zig
 .zig-cache/
 zig-out/
 *.o
 
-Minecraft/
+*.spv
+*.out
+*Minecraft*
 vulkan-sdk

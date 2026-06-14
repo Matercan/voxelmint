@@ -2,6 +2,7 @@ const std = @import("std");
 const block = @import("../block.zig");
 const Block = @import("../manager.zig").Block;
 const gpu = @import("rendering.zig");
+const texture = @import("textures.zig");
 
 pub const indices = [_]u32{
     0,  1,  2,  2,  3,  0,
@@ -22,24 +23,8 @@ const blockEdges: [8][3]u8 = .{
     .{ 1, 1, 0 },
     .{ 1, 1, 1 },
 };
-const faceVertices = [_][4]u8{
-    .{ 0, 1, 5, 4 }, // bottom (-Y)
-    .{ 2, 6, 7, 3 }, // top (+Y)
-    .{ 0, 4, 6, 2 }, // front (-Z)
-    .{ 1, 3, 7, 5 }, // back (+Z)
-    .{ 0, 2, 3, 1 }, // left (-X)
-    .{ 4, 5, 7, 6 }, // right (+X)
-};
-const faceTexEdges = [6][4][2]f32{
-    .{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } }, // bottom (-Y)
-    .{ .{ 0, 1 }, .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 } }, // top (+Y)
-    .{ .{ 0, 1 }, .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 } }, // front (-Z)
-    .{ .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 }, .{ 0, 1 } }, // back (+Z)
-    .{ .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 }, .{ 0, 1 } }, // left (-X)
-    .{ .{ 0, 1 }, .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 } }, // right (+X)
-};
 
-/// Model cube: 
+/// Model cube:
 ///
 ///                  y+
 ///                  ↑
@@ -59,15 +44,33 @@ const faceTexEdges = [6][4][2]f32{
 ///    /
 ///   /
 ///  x+
-///
+const faceVertices = [_][4]u8{
+    .{ 0, 1, 5, 4 }, // bottom (-Y)
+    .{ 2, 6, 7, 3 }, // top (+Y)
+    .{ 0, 4, 6, 2 }, // front (-Z)
+    .{ 1, 3, 7, 5 }, // back (+Z)
+    .{ 0, 2, 3, 1 }, // left (-X)
+    .{ 4, 5, 7, 6 }, // right (+X)
+};
+const faceTexEdges = [6][4][2]f32{
+    .{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } }, // bottom (-Y)
+    .{ .{ 0, 1 }, .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 } }, // top (+Y)
+    .{ .{ 0, 1 }, .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 } }, // front (-Z)
+    .{ .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 }, .{ 0, 1 } }, // back (+Z)
+    .{ .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 }, .{ 0, 1 } }, // left (-X)
+    .{ .{ 0, 1 }, .{ 1, 1 }, .{ 1, 0 }, .{ 0, 0 } }, // right (+X)
+};
+
+const faceSuffixes: [7][*:0]const u8 = .{ "top", "bottom", "side", "front", "back", "inner", "outer" };
 
 pub const Vertex = extern struct {
     pos: [3]f32,
     color: [3]f32,
     tex_coord: [2]f32,
+    texIndex: u32,
 };
 
-pub fn convertBlockToVertexes(blk: block.BlockProperties) [24]Vertex {
+pub fn convertBlockToVertexes(blk: block.BlockProperties, app: *gpu.Application) ![24]Vertex {
     const pos = blk.position;
     var out: [24]Vertex = undefined;
 
@@ -82,12 +85,9 @@ pub fn convertBlockToVertexes(blk: block.BlockProperties) [24]Vertex {
             const z = @as(f32, @floatFromInt(pos[2] + blockEdges[idx][2]));
 
             const vertexIndex = f * 4 + v;
+            const texIndex = app.getTextureIndex(blk.texture.ptr);
 
-            out[vertexIndex] = .{
-                .pos = .{ x, y, z },
-                .color = if (f % 2 == 0) .{ 1.0, 0.0, 1.0 } else .{ 0.0, 0.0, 0.0 },
-                .tex_coord = faceTexEdges[f][v],
-            };
+            out[vertexIndex] = .{ .pos = .{ x, y, z }, .color = if (v % 2 == 0) .{ 1.0, 0.0, 1.0 } else .{ 1.0, 1.0, 1.0 }, .tex_coord = faceTexEdges[f][v], .texIndex = texIndex,};
         }
     }
 

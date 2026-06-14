@@ -40,7 +40,7 @@ static const char* FACE_SUFFIXES[] = {
 };
 
 /* Prefix for block textures inside the jar/zip */
-static const char* TEXTURE_PREFIX = "assets/minecraft/textures/block/";
+static const char* TEXTURE_PREFIX = "Default-Java-1.21.11/assets/minecraft/textures/block/";
 
 /* Maximum number of distinct block base-names we expect */
 #define MAX_BLOCKS 4096
@@ -115,7 +115,7 @@ typedef struct {
 static void obuf_append(OBuf* b, const void* src, size_t n) {
   if (b->len + n > b->cap) {
     b->cap  = (b->len + n) * 2 + 4096;
-    b->data = realloc(b->data, b->cap);
+    b->data = (unsigned char*)realloc(b->data, b->cap);
     if (!b->data) {
       fputs("OOM\n", stderr);
       exit(1);
@@ -139,7 +139,7 @@ static unsigned char* zip_read_entry(zip_t* z, zip_int64_t idx, size_t* out_len)
   zip_file_t* zf = zip_fopen_index(z, (zip_uint64_t)idx, 0);
   if (!zf) return NULL;
 
-  unsigned char* buf = malloc(st.size);
+  unsigned char* buf = (unsigned char*)malloc(st.size);
   if (!buf) {
     zip_fclose(zf);
     return NULL;
@@ -227,7 +227,8 @@ static int pack_face(zip_t* z, const char* zip_path, const char* face_label, OBu
   free(wb.data);
 
   /* Footer */
-  obuf_str(out, "\0end"); /* "\0end\0" – the leading \0 closes the PNG section */
+  obuf_str(out, "");
+  obuf_str(out, "end"); /* "end\0" – the leading \0 closes the PNG section */
 
   printf("    packed face %-8s  %s (%dx%d)\n", face_label, zip_path, w, h);
   return 1;
@@ -296,7 +297,7 @@ int main(int argc, char* argv[]) {
     }
 
     for (int j = 0; FACE_SUFFIXES[j]; j++) {
-      char face_path[512], face_bname[256];
+      char face_path[1024], face_bname[512];
       snprintf(face_path, sizeof(face_path), "%s%s_%s.png", TEXTURE_PREFIX, block,
                FACE_SUFFIXES[j]);
       snprintf(face_bname, sizeof(face_bname), "%s_%s", block, FACE_SUFFIXES[j]);
@@ -311,7 +312,7 @@ int main(int argc, char* argv[]) {
       continue;
     }
 
-    char out_entry[256];
+    char out_entry[512];
     snprintf(out_entry, sizeof(out_entry), "%s.gtex", block);
 
     zip_source_t* src = zip_source_buffer(zout, packed.data, packed.len, 1);

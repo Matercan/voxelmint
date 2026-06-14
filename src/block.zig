@@ -12,4 +12,4 @@ pub const BlockProperties = struct {
     texture: []const u8,
 };
 
-pub const BlockFunctions = struct { update: *const fn (*anyopaque) anyerror!void, destroy: *const fn (*anyopaque, std.mem.Allocator) anyerror!void, properties: *const fn (*const anyopaque) BlockProperties };
+pub const BlockFunctions = struct { update: *const fn (*anyopaque, f32) anyerror!void, destroy: *const fn (*anyopaque, std.mem.Allocator) anyerror!void, properties: *const fn (*const anyopaque) BlockProperties };

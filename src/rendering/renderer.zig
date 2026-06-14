@@ -7,7 +7,7 @@ pub const Renderer = struct {
     current_blocks: []const Block,
     arena: std.heap.ArenaAllocator,
     app: *gpu.Application,
-    mutex: std.Thread.Mutex,
+    mutex: std.atomic.Mutex,
 
     pub fn init(blocks: []const Block) !Renderer {
         const arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -18,7 +18,7 @@ pub const Renderer = struct {
             .current_blocks = blocks,
             .arena = arena,
             .app = app,
-            .mutex = std.Thread.Mutex{},
+            .mutex = .unlocked,
         };
     }
 
@@ -31,8 +31,7 @@ pub const Renderer = struct {
         _ = self.arena.reset(.retain_capacity);
         const allocator = self.arena.allocator();
 
-        // copy current_blocks under the lock, then release
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) {}
         const blocks = self.current_blocks;
         self.mutex.unlock();
 
@@ -43,7 +42,7 @@ pub const Renderer = struct {
         defer indicesList.deinit(allocator);
 
         for (blocks, 0..) |blk, i| {
-            const vertices = block.convertBlockToVertexes(blk);
+            const vertices = try block.convertBlockToVertexes(blk, self.app);
             try verticesList.appendSlice(allocator, &vertices);
 
             const base: u32 = @intCast(i * 24);
@@ -63,7 +62,10 @@ pub const Renderer = struct {
     }
 
     pub fn change_blocks(self: *Renderer, blocks: []const Block) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) {}
+        if (self.current_blocks.len > 0) {
+            self.arena.allocator().free(self.current_blocks);
+        }
         self.current_blocks = blocks;
         self.mutex.unlock();
     }

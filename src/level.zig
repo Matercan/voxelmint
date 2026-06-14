@@ -42,14 +42,10 @@ pub const Level = struct {
     }
 
     pub fn tick(self: *Level) !void {
-        var thread = try std.Thread.spawn(.{}, Renderer.render, .{&self.renderer});
-
         var properties = try self.manager.get_properties();
-        defer properties.deinit(self.manager.allocator);
-        try self.renderer.change_blocks(properties.items);
-        try self.manager.update_all();
-
-        thread.join();
+        try self.renderer.change_blocks(try properties.toOwnedSlice(self.manager.allocator));
+        try self.manager.update_all(self.renderer.app.getDeltaTime());
+        try self.renderer.render();
     }
 
     pub fn run(self: *Level) !void {

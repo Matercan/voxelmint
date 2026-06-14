@@ -32,6 +32,7 @@ pub fn build(b: *std.Build) void {
     mod.linkSystemLibrary("vulkan", .{});
     mod.linkSystemLibrary("wayland-client", .{});
     mod.linkSystemLibrary("glfw", .{});
+    mod.linkSystemLibrary("zip", .{});
     mod.link_libcpp = true;
 
     const exe = b.addExecutable(.{

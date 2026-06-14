@@ -22,12 +22,18 @@ pub const TestBlock = struct {
         return .{
             .position = .{ block.x, block.y, block.z },
             .rotation = .{ 0, 0, 0 },
-            .texture = "dirt.gtex",
+            .texture = block.texture_file,
         };
     }
 
-    fn update(self: *anyopaque) !void {
-        _ = self;
+    fn update(self: *anyopaque, deltaTime: f32) !void {
+        const block: *TestBlock = @ptrCast(@alignCast(self));
+        if (block.x % 2 == 0) {
+            block.x += 1;
+        } else {
+            block.x -= 1;
+        }
+        std.debug.print("delta time: {}\n", .{deltaTime});
     }
 
     fn destroy(self: *anyopaque, allocator: std.mem.Allocator) !void {

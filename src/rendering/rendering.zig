@@ -11,6 +11,8 @@ pub const Application = opaque {
     pub extern fn closeApplication(*Application) callconv(.c) void;
     pub extern fn setVertices(*Application, [*]Vertex, usize, [*]u32, usize) callconv(.c) void;
     pub extern fn pushVertices(*Application, [*]Vertex, usize, [*]u32, usize) callconv(.c) void;
+    pub extern fn getTextureIndex(*Application, [*]const u8) u32;
+    pub extern fn getDeltaTime(*Application) f32;
 };
 pub extern fn getApplication() callconv(.c) *Application;
 pub extern fn run() callconv(.c) c_int;

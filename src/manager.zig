@@ -31,9 +31,9 @@ pub const Manager = struct {
         self.blocks.deinit(self.allocator);
     }
 
-    pub fn update_all(self: *Manager) !void {
+    pub fn update_all(self: *Manager, deltaTime: f32) !void {
         for (self.buffer.items, self.blocks.items) |blk, blk_ptr| {
-            try blk.update(blk_ptr);
+            try blk.update(blk_ptr, deltaTime);
         }
     }
 

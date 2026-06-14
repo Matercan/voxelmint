@@ -10,9 +10,11 @@
 #include <stdexcept>
 #include <fstream>
 #include <chrono>
+#include <string>
 #include <tuple>
 #include <mutex>
 #include <vector>
+#include <print>
 
 #ifdef WINDOWS
 
@@ -42,13 +44,16 @@ import vulkan_hpp;
 #include <glm/trigonometric.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "../include/stb/stb_image.h"
+#include "../include/stb/stb_image_resize2.h"
 
 #include "vertex.hpp"
 
 extern "C" constexpr uint32_t WIDTH                = 800;
 extern "C" constexpr uint32_t HEIGHT               = 800;
 extern "C" constexpr int      MAX_FRAMES_IN_FLIGHT = 2;
+extern "C" constexpr uint8_t  POV                  = 60;
 
 const std::vector<char const*> validationLayers        = {"VK_LAYER_KHRONOS_validation"};
 std::vector<const char*>       requiredDeviceExtension = {vk::KHRSwapchainExtensionName};
@@ -169,6 +174,7 @@ public:
   void tick() {
     glfwPollEvents();
     drawFrame();
+    setDeltaTime();
   }
 
   void close() {
@@ -180,6 +186,22 @@ public:
 
     pendingUploads.push(
       {.vertices = std::move(vertices), .indices = std::move(indices), .reset = reset});
+  }
+
+  uint32_t getTextureIndex(std::string name) {
+    auto faceValue = textureToIdx.find(name);
+    if (faceValue == textureToIdx.end()) {
+      std::string baseName =
+        name.substr(0, std::distance(name.begin(), std::find(name.begin(), name.end(), '_')));
+      auto baseValue = textureToIdx.find(baseName);
+      return baseValue == textureToIdx.end() ? -1 : baseValue->second;
+    } else {
+      return faceValue->second;
+    }
+  }
+
+  float deltaTimeMS() {
+    return this->deltaTime;
   }
 
 private:
@@ -214,10 +236,11 @@ private:
   std::vector<uint32_t>               currentIndexCount;
   bool                                drawingDataAvailable = false;
 
-  vk::raii::Image        textureImage       = nullptr;
-  vk::raii::DeviceMemory textureImageMemory = nullptr;
-  vk::raii::ImageView    textureImageView   = nullptr;
-  vk::raii::Sampler      textureSampler     = nullptr;
+  vk::raii::Image                           textureImage       = nullptr;
+  vk::raii::DeviceMemory                    textureImageMemory = nullptr;
+  vk::raii::ImageView                       textureImageView   = nullptr;
+  vk::raii::Sampler                         textureSampler     = nullptr;
+  std::unordered_map<std::string, uint32_t> textureToIdx;
 
   vk::raii::Image        depthImage       = nullptr;
   vk::raii::DeviceMemory depthImageMemory = nullptr;
@@ -230,6 +253,7 @@ private:
   vk::raii::DescriptorPool             descriptorPool = nullptr;
   std::vector<vk::raii::DescriptorSet> descriptorSets;
 
+  float                                deltaTime;
   uint32_t                             queueIndex  = ~0;
   uint32_t                             frameIndex  = 0;
   vk::raii::CommandPool                commandPool = nullptr;
@@ -335,14 +359,14 @@ private:
     UniformBufferObject ubo{};
     ubo.model = rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.view =
-      lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    ubo.proj = glm::perspective(glm::radians(45.0f),
+      lookAt(glm::vec3(5.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.proj = glm::perspective(glm::radians(static_cast<float>(POV)),
                                 static_cast<float>(swapChainExtent.width) /
                                   static_cast<float>(swapChainExtent.height),
                                 0.1f, 10.0f);
 
     ubo.proj[1][1] *= -1;
-    memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+    std::memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
   }
 
   void processPendingUploads() {
@@ -350,9 +374,8 @@ private:
 
     if (pendingUploads.empty()) return;
 
-    std::vector<Vertex>                  vertices{};
-    std::vector<uint32_t>                indices{};
-    std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+    static std::vector<Vertex>   vertices{};
+    static std::vector<uint32_t> indices{};
 
     while (!pendingUploads.empty()) {
       MeshUploadJob job = std::move(pendingUploads.front());
@@ -361,7 +384,6 @@ private:
       if (job.reset) {
         vertices.clear();
         indices.clear();
-        uniqueVertices.clear();
       }
 
       vertices.insert(vertices.end(), job.vertices.begin(), job.vertices.end());
@@ -371,12 +393,24 @@ private:
     if (vertices.empty()) return;
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-      memcpy(vertexBuffersMapped[i], vertices.data(), vertices.size() * sizeof(vertices[0]));
-      memcpy(indexBuffersMapped[i], indices.data(), indices.size() * sizeof(indices[0]));
+      std::memcpy(vertexBuffersMapped[i], vertices.data(), vertices.size() * sizeof(vertices[0]));
+      std::memcpy(indexBuffersMapped[i], indices.data(), indices.size() * sizeof(indices[0]));
       currentIndexCount[i] = static_cast<uint32_t>(indices.size());
     }
 
     drawingDataAvailable = true;
+  }
+
+  void setDeltaTime() {
+    static auto startTime   = std::chrono::high_resolution_clock::now();
+    auto        currentTime = std::chrono::high_resolution_clock::now();
+
+    float time =
+      std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - startTime)
+        .count();
+
+    startTime = currentTime;
+    deltaTime = time;
   }
 
   void cleanupSwapChain() {
@@ -603,10 +637,11 @@ private:
   }
 
   void createDescriptorSetLayout() {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
       {{0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex},
-       {1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment}}};
-    ;
+       {1, vk::DescriptorType::eSampledImage, 1, vk::ShaderStageFlagBits::eFragment},
+       {2, vk::DescriptorType::eSampler, 1, vk::ShaderStageFlagBits::eFragment}}};
+
     vk::DescriptorSetLayoutCreateInfo layoutInfo;
     layoutInfo.bindingCount = bindings.size();
     layoutInfo.pBindings    = bindings.data();
@@ -729,49 +764,101 @@ private:
     vk::Format depthFormat                 = findDepthFormat();
     std::tie(depthImage, depthImageMemory) = createImage(
       swapChainExtent.width, swapChainExtent.height, depthFormat, vk::ImageTiling::eOptimal,
-      vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal);
+      vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, 1);
 
     depthImageView = createImageView(*depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
   }
 
   void createTextureImage() {
-    int      texWidth, texHeight, texChannels;
-    stbi_uc* pixels =
-      stbi_load("textures/image.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    vk::DeviceSize imageSize = texWidth * texHeight * 4;
-
-    if (!pixels) {
-      throw std::runtime_error("failed to load texture image!");
-    }
+    TexManager* textures     = getTexManager();
+    auto        texturesSize = getTexturesSize(textures);
+    auto        textureCount = getTextureCount(textures);
+    auto        faceCount    = getFaceCount(textures);
+    auto        textureSize  = getTextureSize(textures);
 
     auto [stagingBuffer, stagingBufferMemory] = createBuffer(
-      imageSize, vk::BufferUsageFlagBits::eTransferSrc,
+      texturesSize, vk::BufferUsageFlagBits::eTransferSrc,
       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    void* data = stagingBufferMemory.mapMemory(0, texturesSize);
 
-    void* data = stagingBufferMemory.mapMemory(0, imageSize);
-    memcpy(data, pixels, imageSize);
-    stagingBufferMemory.unmapMemory();
-
-    stbi_image_free(pixels);
-
-    std::tie(textureImage, textureImageMemory) =
-      createImage(texWidth, texHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal,
-                  vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-                  vk::MemoryPropertyFlagBits::eDeviceLocal);
+    uint64_t offset = 0;
 
     vk::raii::CommandBuffer commandBuffer = beginSingleTimeCommandBuffer();
+
+    std::tie(textureImage, textureImageMemory) = createImage(
+      textureSize[0], textureSize[1], vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal,
+      vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+      vk::MemoryPropertyFlagBits::eDeviceLocal, faceCount + 1);
+
     transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eUndefined,
-                          vk::ImageLayout::eTransferDstOptimal);
-    copyBufferToImage(commandBuffer, stagingBuffer, textureImage, static_cast<uint32_t>(texWidth),
-                      static_cast<uint32_t>(texHeight));
+                          vk::ImageLayout::eTransferDstOptimal, faceCount);
+
+    size_t totalCount = 0;
+    for (uint32_t i = 0; i < textureCount; i++) {
+
+      uint8_t      size;
+      FaceTexture* faceTextures = getNextTextures(textures, &size);
+
+      for (size_t j = 0; j < size; j++) {
+        if (!faceTextures[j].data) {
+          totalCount++;
+          continue;
+        }
+
+        size_t imageSize = faceTextures[j].width * faceTextures[j].height * 4;
+        // std::println("Current offset: {}, Current index: {}", offset, totalCount);
+        // std::println("  Width: {}, Height: {}", faceTextures[j].width, faceTextures[j].height);
+        std::memcpy((char*)data + offset, faceTextures[j].data, imageSize);
+
+        vk::BufferImageCopy region{offset,
+                                   0,
+                                   0,
+                                   {vk::ImageAspectFlagBits::eColor, 0, (uint32_t)totalCount,
+                                    1},       // baseArrayLayer=totalCount, layerCount=1
+                                   {0, 0, 0}, // imageOffset all zeros
+                                   {textureSize[0], textureSize[1], 1}};
+
+        commandBuffer.copyBufferToImage(stagingBuffer, textureImage,
+                                        vk::ImageLayout::eTransferDstOptimal, region);
+
+        std::string label = (std::strcmp(faceTextures[j].label, "front") == 0)
+                              ? std::string{}
+                              : std::string(faceTextures[j].label);
+
+        auto        name = std::string(faceTextures[j].baseTexture);
+        std::string baseName =
+          name.substr(0, std::distance(name.begin(), std::find(name.begin(), name.end(), '.')));
+        std::string fullName = baseName + (label.empty() ? "" : "_") + std::string(label) + ".gtex";
+        textureToIdx.insert({fullName, totalCount});
+
+        stbi_image_free(faceTextures[j].data);
+        std::free(faceTextures[j].label);
+
+        offset += imageSize;
+        totalCount++;
+      }
+    }
+
+    std::free(textureSize);
+
+    stagingBufferMemory.unmapMemory();
+    freeTexManager(textures);
+
     transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eTransferDstOptimal,
-                          vk::ImageLayout::eShaderReadOnlyOptimal);
+                          vk::ImageLayout::eShaderReadOnlyOptimal, faceCount);
     endSingleTimeCommandBuffer(std::move(commandBuffer));
   }
 
   void createTextureImageView() {
-    textureImageView =
-      createImageView(*textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
+    vk::ImageViewCreateInfo viewInfo;
+    TexManager*             textures = getTexManager();
+    viewInfo.image                   = textureImage;
+    viewInfo.viewType                = vk::ImageViewType::e2DArray;
+    viewInfo.format                  = vk::Format::eR8G8B8A8Srgb;
+    viewInfo.subresourceRange        = {vk::ImageAspectFlagBits::eColor, 0, 1, 0,
+                                        (uint32_t)getFaceCount(textures)};
+    textureImageView                 = vk::raii::ImageView(device, viewInfo);
+    freeTexManager(textures);
   }
 
   void createTextureSampler() {
@@ -838,9 +925,10 @@ private:
   }
 
   void createDescriptorPool() {
-    std::array<vk::DescriptorPoolSize, 2> poolSize{
+    std::array<vk::DescriptorPoolSize, 3> poolSize{
       {{vk::DescriptorType::eUniformBuffer, MAX_FRAMES_IN_FLIGHT},
-       {vk::DescriptorType::eCombinedImageSampler, MAX_FRAMES_IN_FLIGHT}}};
+       {vk::DescriptorType::eSampledImage, MAX_FRAMES_IN_FLIGHT},
+       {vk::DescriptorType::eSampler, MAX_FRAMES_IN_FLIGHT}}};
     vk::DescriptorPoolCreateInfo poolInfo{vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
                                           MAX_FRAMES_IN_FLIGHT,
                                           static_cast<uint32_t>(poolSize.size()), poolSize.data()};
@@ -856,8 +944,11 @@ private:
     descriptorSets = device.allocateDescriptorSets(allocInfo);
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       vk::DescriptorBufferInfo bufferInfo(uniformBuffers[i], 0, sizeof(UniformBufferObject));
-      vk::DescriptorImageInfo  imageInfo(textureSampler, textureImageView,
-                                         vk::ImageLayout::eReadOnlyOptimal);
+
+      vk::DescriptorImageInfo imageInfo({}, textureImageView,
+                                        vk::ImageLayout::eShaderReadOnlyOptimal);
+
+      vk::DescriptorImageInfo samplerInfo(textureSampler, {}, {});
 
       vk::WriteDescriptorSet bWrite;
       bWrite.dstSet          = descriptorSets[i];
@@ -872,9 +963,19 @@ private:
       iWrite.dstBinding      = 1;
       iWrite.dstArrayElement = 0;
       iWrite.descriptorCount = 1;
-      iWrite.descriptorType  = vk::DescriptorType::eCombinedImageSampler;
+      iWrite.descriptorType  = vk::DescriptorType::eSampledImage;
       iWrite.pImageInfo      = &imageInfo;
-      device.updateDescriptorSets(std::array<vk::WriteDescriptorSet, 2>{bWrite, iWrite}, {});
+
+      vk::WriteDescriptorSet sWrite;
+      sWrite.dstSet          = descriptorSets[i];
+      sWrite.dstBinding      = 2;
+      sWrite.dstArrayElement = 0;
+      sWrite.descriptorCount = 1;
+      sWrite.descriptorType  = vk::DescriptorType::eSampler;
+      sWrite.pImageInfo      = &samplerInfo;
+
+      device.updateDescriptorSets(std::array<vk::WriteDescriptorSet, 3>{bWrite, iWrite, sWrite},
+                                  {});
     }
   }
 
@@ -992,14 +1093,15 @@ private:
   }
 
   void transitionImageLayout(vk::raii::CommandBuffer& commandBuffer, const vk::raii::Image& image,
-                             vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
+                             vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
+                             uint32_t layerCount = 1) {
     vk::ImageMemoryBarrier barrier;
     barrier.oldLayout           = oldLayout;
     barrier.newLayout           = newLayout;
     barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
     barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
     barrier.image               = image;
-    barrier.subresourceRange    = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+    barrier.subresourceRange    = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, layerCount};
 
     vk::PipelineStageFlags sourceStage;
     vk::PipelineStageFlags destinationStage;
@@ -1079,13 +1181,14 @@ private:
 
   constexpr std::pair<vk::raii::Image, vk::raii::DeviceMemory>
   createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling,
-              vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties) {
+              vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties,
+              uint32_t textureCount) {
     vk::ImageCreateInfo imageInfo;
     imageInfo.imageType   = vk::ImageType::e2D;
     imageInfo.format      = format;
     imageInfo.extent      = (vk::Extent3D){width, height, 1};
     imageInfo.mipLevels   = 1;
-    imageInfo.arrayLayers = 1;
+    imageInfo.arrayLayers = textureCount;
     imageInfo.samples     = vk::SampleCountFlagBits::e1;
     imageInfo.tiling      = tiling;
     imageInfo.usage       = usage;
@@ -1126,14 +1229,6 @@ private:
     vk::raii::CommandBuffer commandCopyBuffer = beginSingleTimeCommandBuffer();
     commandCopyBuffer.copyBuffer(*srcBuffer, *dstBuffer, vk::BufferCopy(0, 0, size));
     endSingleTimeCommandBuffer(std::move(commandCopyBuffer));
-  }
-
-  void copyBufferToImage(vk::raii::CommandBuffer& commandBuffer, const vk::raii::Buffer& buffer,
-                         vk::raii::Image& image, uint32_t width, uint32_t height) {
-    vk::BufferImageCopy region{
-      0, 0, 0, {vk::ImageAspectFlagBits::eColor, 0, 0, 1}, {0, 0, 0}, {width, height, 1}};
-
-    commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, region);
   }
 
   constexpr uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
@@ -1212,5 +1307,16 @@ void pushVertices(Application* app, Vertex* vertices, size_t vert_len, uint32_t*
   std::vector<Vertex>   verts(vertices, vertices + vert_len);
   std::vector<uint32_t> inds(indices, indices + ind_len);
   app->pushVertices(std::move(verts), std::move(inds), false);
+}
+
+uint32_t getTextureIndex(Application* app, char* name) {
+  std::string        textureName{name};
+  stbir_pixel_layout x;
+  return app->getTextureIndex(textureName);
+}
+
+float getDeltaTime(Application* app) {
+  float x = 2;
+  return app->deltaTimeMS();
 }
 }
