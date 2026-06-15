@@ -15,6 +15,7 @@
 #include <mutex>
 #include <vector>
 #include <print>
+#include <unordered_map>
 
 #ifdef WINDOWS
 
@@ -517,7 +518,7 @@ private:
       }
     }
 
-    if (queueIndex == ~0) {
+    if (queueIndex == ~static_cast<uint32_t>(0)) {
       throw std::runtime_error("Could not find a queue for graphics and present -> terminating");
     }
     vk::DeviceQueueCreateInfo deviceQueueCreateInfo;
@@ -597,7 +598,6 @@ private:
 
     std::vector<vk::PresentModeKHR> availablePresentModes =
       physicalDevice.getSurfacePresentModesKHR(*surface);
-    vk::PresentModeKHR presentMode = chooseSwapPresentMode(availablePresentModes);
 
     vk::SwapchainCreateInfoKHR swapChainCreateInfo;
     swapChainCreateInfo.surface          = *surface;
@@ -1218,7 +1218,7 @@ private:
 
     commandBuffer.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
 
-    return std::move(commandBuffer);
+    return commandBuffer;
   }
 
   void endSingleTimeCommandBuffer(vk::raii::CommandBuffer&& commandBuffer) {
@@ -1386,13 +1386,11 @@ void pushVertices(Application* app, Vertex* vertices, size_t vert_len, uint32_t*
 }
 
 uint32_t getTextureIndex(Application* app, char* name) {
-  std::string        textureName{name};
-  stbir_pixel_layout x;
+  std::string textureName{name};
   return app->getTextureIndex(textureName);
 }
 
 float getDeltaTime(Application* app) {
-  float x = 2;
   return app->deltaTimeMS();
 }
 }
