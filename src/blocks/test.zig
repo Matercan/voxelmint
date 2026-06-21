@@ -33,8 +33,9 @@ pub const TestBlock = struct {
         } else {
             block.x -= 1;
         }
-        std.debug.print("delta time: {}\n", .{deltaTime});
-        std.debug.print("Frames per second: {}\n", .{1000 / deltaTime});
+        _ = deltaTime;
+        // std.debug.print("delta time: {}\n", .{deltaTime});
+        // std.debug.print("Frames per second: {}\n", .{1000 / deltaTime});
     }
 
     fn destroy(self: *anyopaque, allocator: std.mem.Allocator) !void {
