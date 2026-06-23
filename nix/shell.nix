@@ -4,18 +4,20 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    zig
+    # zig
     gcc
     clang
     libclang
     pkg-config
+    rustc
+    cargo
 
     vulkan-headers
     vulkan-loader
     vulkan-tools
     vulkan-validation-layers
-    raylib
-    libxcb
+    # raylib
+    # libxcb
     libzip
 
     glm

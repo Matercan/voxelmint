@@ -6,3 +6,8 @@ zig-out/
 *.out
 *Minecraft*
 vulkan-sdk
+
+
+# Added by cargo
+
+/target

@@ -849,8 +849,8 @@ private:
     stagingBufferMemory.unmapMemory();
     freeTexManager(textures);
 
-    generateMipmaps(commandBuffer, textureImage, vk::Format::eR8G8B8A8Srgb, textureSize[0], textureSize[1],
-                    textureCount, mipLevels);
+    generateMipmaps(commandBuffer, textureImage, vk::Format::eR8G8B8A8Srgb, textureSize[0],
+                    textureSize[1], textureCount, mipLevels);
     transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eTransferDstOptimal,
                           vk::ImageLayout::eShaderReadOnlyOptimal, faceCount, mipLevels);
     endSingleTimeCommandBuffer(std::move(commandBuffer));
@@ -1393,7 +1393,7 @@ uint32_t getTextureIndex(Application* app, char* name) {
   return app->getTextureIndex(textureName);
 }
 
-float getDeltaTime(Application* app) {
+float getDeltaTime(Application* const app) {
   return app->deltaTimeMS();
 }
 }
