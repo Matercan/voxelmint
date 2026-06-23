@@ -1,3 +1,5 @@
+# Added by zig
+
 .zig-cache/
 zig-out/
 *.o
@@ -6,7 +8,7 @@ zig-out/
 *.out
 *Minecraft*
 vulkan-sdk
-
+*.svg
 
 # Added by cargo
 
