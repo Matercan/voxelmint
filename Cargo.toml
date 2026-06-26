@@ -7,4 +7,7 @@ edition = "2024"
 cc = "1"
 
 [dependencies]
+easy-parallel = "3.3.1"
 libc = "0.2.186"
+smol = "2.0.2"
+thiserror = "2.0.18"

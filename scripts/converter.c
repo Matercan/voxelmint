@@ -8,8 +8,6 @@
  *
  *   "<W>x<H>\0<face_name>\0<png bytes>\0end\0"
  *
- * Blocks with only a single texture get the same layout with face "front".
- *
  * Dependencies: libzip, stb_image (header-only, vendored inline below)
  *
  * Build:
@@ -293,7 +291,7 @@ int main(int argc, char* argv[]) {
     snprintf(plain_path, sizeof(plain_path), "%s%s.png", TEXTURE_PREFIX, block);
     if (zip_name_locate(zin, plain_path, 0) >= 0) {
       visited_check_insert(block);
-      nfaces += pack_face(zin, plain_path, "front", &packed);
+      nfaces += pack_face(zin, plain_path, "", &packed);
     }
 
     for (int j = 0; FACE_SUFFIXES[j]; j++) {

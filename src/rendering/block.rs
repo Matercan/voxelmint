@@ -1,5 +1,5 @@
-use crate::blocks::BlockProperties;
 use crate::rendering::{Application, getTextureIndex};
+use std::ffi::CString;
 
 pub const INDICES: [u32; 36] = [
     0,  1,  2,  2,  3,  0,
@@ -74,26 +74,36 @@ pub struct Vertex {
     pub tex_index: u32,
 }
 
-pub fn convert_block_to_vertices(
-    blk: &Box<dyn BlockProperties>,
-    app: &mut Application,
-) -> [Vertex; 24] {
-    let props = blk.to_base_lock();
-    let pos = props.position;
+impl Default for Vertex {
+    fn default() -> Self {
+        Self { pos: [0.0, 0.0, 0.0], color: [0.0, 0.0, 0.0], tex_coord: [0.0, 0.0], tex_index: u32::MAX }
+    }
+}
 
-    let mut out: [std::mem::MaybeUninit<Vertex>; 24] =
-        std::array::from_fn(|_| std::mem::MaybeUninit::uninit());
+pub fn convert_block_to_vertices(
+    pos: [i32; 3],
+    texture: String,
+    app: &Application,
+) -> [Vertex; 24] {
+    let mut out: [Vertex; 24] =
+        std::array::from_fn(|_| Vertex::default());
+
+    let c_texture = CString::new(texture.as_str()).or_else(|e| {
+        CString::new(&texture[0..e.nul_position()-1])
+    }).expect("CString::new failed");
+    let c_ptr = c_texture.as_ptr();
 
     for f in 0..6 {
         for v in 0..4 {
             let idx = FACE_VERTICES[f][v] as usize;
 
-            let x = (pos[0] + BLOCK_EDGES[idx][0] as isize) as f32;
-            let y = (pos[1] + BLOCK_EDGES[idx][1] as isize) as f32;
-            let z = (pos[2] + BLOCK_EDGES[idx][2] as isize) as f32;
+            let x = (pos[0] + i32::from(BLOCK_EDGES[idx][0])) as f32;
+            let y = (pos[1] + i32::from(BLOCK_EDGES[idx][1])) as f32;
+            let z = (pos[2] + i32::from(BLOCK_EDGES[idx][2])) as f32;
 
             let vertex_index = f * 4 + v;
-            let tex_index = unsafe { getTextureIndex(app.0.cast(), props.texture.as_ptr().cast()) };
+            let tex_index = unsafe { getTextureIndex(app.0.cast(), c_ptr) };
+            println!("Texture index: {tex_index}");
 
             let color = if v % 2 == 0 {
                 [1.0, 0.0, 1.0]
@@ -101,15 +111,14 @@ pub fn convert_block_to_vertices(
                 [1.0, 1.0, 1.0]
             };
 
-            out[vertex_index].write(Vertex {
+            out[vertex_index] = Vertex {
                 pos: [x, y, z],
                 color,
                 tex_coord: FACE_TEX_EDGES[f][v],
                 tex_index,
-            });
+            };
         }
     }
 
-    // SAFETY: every element was written in the loops above (6 faces × 4 verts = 24)
-    unsafe { std::array::from_fn(|i| out[i].assume_init_read()) }
+    return out; 
 }

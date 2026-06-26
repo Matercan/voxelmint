@@ -3,7 +3,16 @@ use std::ffi::{c_char, c_void};
 use crate::rendering::block::Vertex;
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Application(*mut c_void);
+impl Application {
+    pub fn get(&self) -> *const c_void {
+        self.0.cast_const() 
+    }
+}
+
+unsafe impl Send for Application {}
+unsafe impl Sync for Application {}
 
 unsafe extern "C" {
     pub fn getApplication() -> *mut c_void;

@@ -41,10 +41,10 @@ SamplerState texSampler;
 
 [shader("fragment")]
 float4 fragMain(VSOutput vertIn) : SV_TARGET {
-    if (vertIn.fragTexIndex == -1) {
+    if (vertIn.fragTexIndex == 4294967295) {
         return float4(vertIn.fragColor,  1.0);
     } else {
         float3 uvw = float3(vertIn.fragTexCoord, (float)vertIn.fragTexIndex);
         return textures.Sample(texSampler, uvw);
     }
- }
+}

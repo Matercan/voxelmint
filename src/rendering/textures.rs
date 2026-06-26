@@ -187,7 +187,8 @@ impl TextureManager {
                 Some(i) => pos + i,
                 None => break,
             };
-            let face_label = data[pos..label_end].to_vec().into_boxed_slice();
+            let face_label = data[pos..label_end+1].to_vec().into_boxed_slice();
+            println!("Printing the face label: {:?}", face_label);
             let label_ptr = Box::into_raw(face_label) as *mut u8;
             pos = label_end + 1;
 

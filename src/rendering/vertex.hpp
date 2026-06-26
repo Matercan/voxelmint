@@ -50,6 +50,6 @@ void         freeTexManager(TexManager*);
 int64_t      getTextureCount(TexManager*);
 size_t       getFaceCount(TexManager*);
 size_t       getTexturesSize(TexManager*);
-uint8_t*     getTextureSize(TexManager*);
+uint32_t*     getTextureSize(TexManager*);
 FaceTexture* getNextTextures(TexManager*, uint8_t*);
 }

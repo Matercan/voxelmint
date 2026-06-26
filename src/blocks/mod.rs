@@ -1,9 +1,6 @@
 use std::any::Any;
 
-use crate::blocks::properties::BaseBlock;
-
 pub trait BlockProperties: Any {
-     fn to_base_lock(&self) -> BaseBlock;
      fn as_any(&self) -> &dyn Any;
 }
 
@@ -14,8 +11,12 @@ pub struct UpdateInput {
 
 pub trait Block {
     fn update(&mut self, input: UpdateInput);
+    fn texture(&self) -> String;
     fn properties(&self) -> Box<dyn BlockProperties>;
 }
 
-mod properties;
+mod chunk;
+mod air; 
 pub mod test;
+pub use chunk::Chunk;
+pub use air::Air;

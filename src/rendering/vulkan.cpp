@@ -47,7 +47,6 @@ import vulkan_hpp;
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "../include/stb/stb_image.h"
-#include "../include/stb/stb_image_resize2.h"
 
 #include "vertex.hpp"
 
@@ -148,9 +147,9 @@ constexpr uint32_t chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const& sur
   return minImageCount;
 }
 
-static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
-  vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type,
-  const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
+static VKAPI_ATTR vk::Bool32 VKAPI_CALL
+debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT _, vk::DebugUtilsMessageTypeFlagsEXT type,
+              const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
   std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage
             << std::endl;
 
@@ -189,6 +188,11 @@ public:
   }
 
   uint32_t getTextureIndex(std::string name) {
+    std::println("Name provided: {}", name);
+    for (auto& pair : textureToIdx) {
+      std::println("Name: {}, Value: {}", pair.first, pair.second);
+    }
+
     auto faceValue = textureToIdx.find(name);
     if (faceValue == textureToIdx.end()) {
       std::string baseName =
@@ -378,6 +382,7 @@ private:
     static std::vector<Vertex>   vertices{};
     static std::vector<uint32_t> indices{};
 
+    size_t i = 0;
     while (!pendingUploads.empty()) {
       MeshUploadJob job = std::move(pendingUploads.front());
       pendingUploads.pop();
@@ -385,13 +390,23 @@ private:
       if (job.reset) {
         vertices.clear();
         indices.clear();
+        continue;
+      }
+
+      for (auto& vertex : job.vertices) {
+        std::println("texture: {}", vertex.texIndex);
       }
 
       vertices.insert(vertices.end(), job.vertices.begin(), job.vertices.end());
       indices.insert(indices.end(), job.indices.begin(), job.indices.end());
+      ++i;
     }
 
     if (vertices.empty()) return;
+
+    if (vertices.size() > 1024) {
+      return;
+    }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
       std::memcpy(vertexBuffersMapped[i], vertices.data(), vertices.size() * sizeof(vertices[0]));
@@ -433,7 +448,7 @@ private:
   }
 
   void create_instance() {
-    constexpr vk::ApplicationInfo appInfo("Hello Triangle", VK_MAKE_VERSION(1, 0, 0), "No Engine",
+    constexpr vk::ApplicationInfo appInfo("Voxelmint", VK_MAKE_VERSION(1, 0, 0), "Voxelmint",
                                           VK_MAKE_VERSION(1, 0, 0), vk::ApiVersion14);
 
     std::vector<const char*> requiredLayers;
@@ -782,8 +797,6 @@ private:
       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     void* data = stagingBufferMemory.mapMemory(0, texturesSize);
 
-    std::print("Image width: {}, Image height: {}\n", textureSize[0], textureSize[1]);
-
     uint64_t offset = 0;
     mipLevels =
       static_cast<uint32_t>(std::floor(std::log2(std::max(textureSize[0], textureSize[1])))) + 1;
@@ -814,9 +827,6 @@ private:
         size_t imageSize = faceTextures[j].width * faceTextures[j].height * 4;
         std::memcpy((char*)data + offset, faceTextures[j].data, imageSize);
 
-        // std::println("Current offset: {}, Current index: {}", offset, totalCount);
-        // std::println("  Width: {}, Height: {}", faceTextures[j].width, faceTextures[j].height);
-
         vk::BufferImageCopy region{offset,
                                    0,
                                    0,
@@ -828,11 +838,8 @@ private:
         commandBuffer.copyBufferToImage(stagingBuffer, textureImage,
                                         vk::ImageLayout::eTransferDstOptimal, region);
 
-        std::string label = (std::strcmp(faceTextures[j].label, "front") == 0)
-                              ? std::string{}
-                              : std::string(faceTextures[j].label);
-
-        auto        name = std::string(faceTextures[j].baseTexture);
+        std::string label = std::string(faceTextures[j].label);
+        auto        name  = std::string(faceTextures[j].baseTexture);
         std::string baseName =
           name.substr(0, std::distance(name.begin(), std::find(name.begin(), name.end(), '.')));
         std::string fullName = baseName + (label.empty() ? "" : "_") + std::string(label) + ".gtex";
@@ -1381,14 +1388,14 @@ void setVertices(Application* app, Vertex* vertices, size_t vert_len, uint32_t* 
   app->pushVertices(std::move(verts), std::move(inds), true);
 }
 
-void pushVertices(Application* app, Vertex* vertices, size_t vert_len, uint32_t* indices,
+void pushVertices(Application* app, const Vertex* vertices, size_t vert_len, const uint32_t* indices,
                   size_t ind_len) {
   std::vector<Vertex>   verts(vertices, vertices + vert_len);
   std::vector<uint32_t> inds(indices, indices + ind_len);
   app->pushVertices(std::move(verts), std::move(inds), false);
 }
 
-uint32_t getTextureIndex(Application* app, char* name) {
+uint32_t getTextureIndex(Application* app, const char* name) {
   std::string textureName{name};
   return app->getTextureIndex(textureName);
 }
