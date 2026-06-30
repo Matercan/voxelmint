@@ -7,7 +7,9 @@ edition = "2024"
 cc = "1"
 
 [dependencies]
+async-trait = "0.1.89"
 easy-parallel = "3.3.1"
+hlua = "0.4.3"
 libc = "0.2.186"
 smol = "2.0.2"
 thiserror = "2.0.18"

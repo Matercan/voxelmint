@@ -1,16 +1,18 @@
+use crate::blocks::GameError;
 use crate::blocks::{Air, Block, BlockProperties, UpdateInput, air::AirProperties};
 use crate::rendering::{Application, block::{INDICES, Vertex, convert_block_to_vertices}};
 
 const CHUNK_WIDTH: usize = 16;
 const CHUNK_SIZE: usize = CHUNK_WIDTH * CHUNK_WIDTH * CHUNK_WIDTH;
 
-pub struct Chunk {
-    blocks: Box<[Box<dyn Block + Send + Sync>; CHUNK_SIZE]>,
+pub struct Chunk<'a> {
+    blocks: Box<[Box<dyn Block<'a> + Send + Sync>; CHUNK_SIZE]>,
     chunk_x: i32,
     chunk_z: i32,
 }
 
-impl Chunk {
+impl<'a> Chunk<'a> {
+    #[must_use]
     fn get_block_idx(relative_block_coords: [u32; 3]) -> usize {
         let x = relative_block_coords[0];
         let y = relative_block_coords[1];
@@ -18,6 +20,7 @@ impl Chunk {
         (y * CHUNK_WIDTH as u32 * CHUNK_WIDTH as u32 + CHUNK_WIDTH as u32 * z + x) as usize
     }
 
+    #[must_use]
     fn get_block_coords(index: usize) -> [u32; 3] {
         let w = CHUNK_WIDTH as usize;
         let w_squared = w * w;
@@ -29,6 +32,7 @@ impl Chunk {
         [x as u32, y as u32, z as u32]
     }
 
+    #[must_use]
     fn get_real_block_coords(&self, relative_block_coords: [u32; 3]) -> [i32; 3] {
         let chunk_coords = self.get_real_coords();
         let x = chunk_coords[0] + relative_block_coords[0] as i32;
@@ -37,10 +41,12 @@ impl Chunk {
         return [x as i32, y as i32, z as i32];
     }
 
+    #[must_use]
     pub fn get_real_coords(&self) -> [i32; 2] {
         [self.chunk_x * CHUNK_WIDTH as i32, self.chunk_z * CHUNK_WIDTH as i32]
     }
 
+    #[must_use]
     pub fn get_chunk_coords(real_x: i32, real_z: i32) -> [i32; 2] {
         let chunk_width = CHUNK_WIDTH as i32;
         
@@ -53,6 +59,7 @@ impl Chunk {
 
     /// Gets 1: The chunk coordinates that the block resides in, 
     /// 2: The relative coordinates of a block within a chunk.
+    #[must_use]
     pub fn get_block_chunk_coords(block_coords: [i32; 3]) -> ([i32; 2], [u32; 3]) {
         let chunk_width = CHUNK_WIDTH as i32;
         
@@ -71,28 +78,30 @@ impl Chunk {
         (chunk_coords, relative_coords)
     }
 
-    pub fn get_properties(&self) -> Vec<Box<dyn BlockProperties>> {
+    #[must_use]
+    pub async fn get_properties(&self) -> Result<Vec<Box<dyn BlockProperties + Send + Sync>>, GameError> {
         let mut properties = Vec::new();
         for block in self.blocks.iter() {
-            properties.push(block.properties()); 
+            properties.push(block.properties().await?); 
         }
 
-        properties 
+        Ok(properties)
     }
 
-    // TODO: Change signatures so that errors are supported.
-    pub fn update_all(&mut self, inputs: UpdateInput) {
+    pub async fn update_all(&mut self, inputs: UpdateInput) -> Result<(), GameError> {
         for block in self.blocks.iter_mut() {
-            block.update(inputs);
+            block.update(inputs).await?;
         }
+
+        Ok(())
     }
 
-    pub fn get_vertices(&self, app: &Application) -> (Vec<Vertex>, Vec<u32>) {
+    pub async fn get_vertices(&self, app: &Application) -> Result<(Vec<Vertex>, Vec<u32>), GameError> {
         let mut vertices: Vec<Vertex> = Vec::with_capacity(CHUNK_SIZE * 24);
         let mut indices: Vec<u32> = Vec::with_capacity(CHUNK_SIZE * 36);
 
         for (i, blk) in self.blocks.iter().enumerate() {
-            if blk.properties().as_any().downcast_ref::<AirProperties>().is_some() {
+            if blk.properties().await?.as_any().downcast_ref::<AirProperties>().is_some() {
                 continue;
             }
 
@@ -100,7 +109,7 @@ impl Chunk {
             
             let verts = convert_block_to_vertices(
                 self.get_real_block_coords(Self::get_block_coords(i)), 
-                blk.texture(), 
+                blk.texture().await?, 
                 app
             ); 
             
@@ -111,7 +120,7 @@ impl Chunk {
             }
         } 
 
-        (vertices, indices)
+        Ok((vertices, indices))
     }
 
     pub fn new(x: i32, z: i32) -> Self {
@@ -122,7 +131,7 @@ impl Chunk {
         }
     }
 
-    pub fn create_block(&mut self, block: Box<dyn Block + Send + Sync>, relative_block_coords: [u32; 3]) {
+    pub fn create_block(&mut self, block: Box<dyn Block<'a> + Send + Sync>, relative_block_coords: [u32; 3]) {
         let idx = Self::get_block_idx(relative_block_coords); 
         self.blocks[idx] = block;
     }

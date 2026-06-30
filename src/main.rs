@@ -9,8 +9,10 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     .collect::<Vec<_>>();
 
     let mut level = Level::new();
-    level.push_blocks(blocks)?;
-    loop {
-        level.tick();
-    }
+    smol::block_on(async {
+        level.push_blocks(blocks).await?;
+        loop {
+            level.tick().await?
+        }
+    })
 }

@@ -1,4 +1,6 @@
-use crate::blocks::{Block, BlockProperties};
+use async_trait::async_trait;
+
+use crate::blocks::{Block, BlockProperties, GameError};
 
 pub struct EmptyProperties {}
 impl BlockProperties for EmptyProperties {
@@ -20,16 +22,18 @@ impl TestBlock {
     }
 }
 
-impl Block for TestBlock {
-    fn update(&mut self, _input: super::UpdateInput) {
-        return;
+#[async_trait]
+impl Block<'_> for TestBlock {
+    async fn update(&mut self, _input: super::UpdateInput) -> Result<(), GameError> {
+        Ok(())
     }
-
-    fn texture(&self) -> String {
-        self.texture_file.clone()        
+    async fn texture(&self) -> Result<String, GameError> {
+        Ok(self.texture_file.clone())        
     }
-
-    fn properties(&self) -> Box<dyn super::BlockProperties> {
-        Box::new(EmptyProperties {})
+    async fn properties(&self) -> Result<Box<dyn super::BlockProperties + Send + Sync>, GameError> {
+        Ok(Box::new(EmptyProperties {}))
+    }
+    fn clone_box(&'_ self) -> Box<dyn Block<'_> + Send + Sync> {
+        Box::new(self.clone())
     }
 }

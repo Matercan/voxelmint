@@ -1,36 +1,53 @@
 {
-  pkgs ? import <nixpkgs> { },
+  mkShell,
+  rustc,
+  cargo,
+  rust-analyzer,
+  rustfmt,
+  clippy,
+  pkg-config,
+  gcc,
+  libclang,
+  libzip,
+  wayland,
+  vulkan-headers,
+  vulkan-tools,
+  vulkan-loader,
+  glm,
+  glfw3,
+  vulkan-validation-layers,
 }:
 
-pkgs.mkShell {
-  buildInputs = with pkgs; [
-    # zig
-    gcc
-    clang
-    libclang
-    pkg-config
-    rustc
-    cargo
+mkShell {
+  name = "voxelmint-dev";
+  strictDeps = true;
 
+  nativeBuildInputs = [
+    libclang
+    cargo
+    rustc
+    clippy
+    rustfmt
+    rust-analyzer
+    pkg-config
+    gcc
+  ];
+
+  buildInputs = [
     vulkan-headers
     vulkan-loader
     vulkan-tools
     vulkan-validation-layers
-    # raylib
-    # libxcb
     libzip
-
-    glm
-    nlohmann_json
-    glfw3
     wayland
+    glm
+    glfw3
   ];
 
   shellHook = /* bash */ ''
     cd ..
   '';
 
-  WAYLAND_PROTOCOLS_DIR = "${pkgs.wayland-protocols}/share/wayland-protocols";
-  VULKAN_PROTOCOLS_DIR = "${pkgs.vulkan-headers}";
-  VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
+  VULKAN_PROTOCOLS_DIR = "${vulkan-headers}";
+  VK_LAYER_PATH = "${vulkan-validation-layers}/share/vulkan/explicit_layer.d";
 }

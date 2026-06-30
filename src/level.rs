@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use smol::lock::Mutex;
 
-use crate::blocks::{Block, UpdateInput};
+use crate::blocks::{Block, GameError, UpdateInput};
 use crate::manager::Manager; 
 use crate::rendering::getDeltaTime;
 use crate::rendering::renderer::Renderer;
@@ -23,24 +23,24 @@ impl Level {
         }
     }
 
-    pub fn update(&mut self) {
+    pub async fn update(&mut self) -> Result<(), GameError> {
         self.manager.update_all(UpdateInput {
             delta_time: unsafe { getDeltaTime(self.renderer.borrow_app().get()) }, 
-        });
+        })
     }
 
-    /// TODO: Multi-threading. Chunking off blocks. (i.e by using push_vertices)
-    pub fn tick(&mut self) {
+    pub async fn tick(&mut self) -> Result<(), GameError> {
         self.renderer.reset_vertices();
-        self.update();
-        self.manager.push_chunk_vertices(Arc::new(Mutex::new(self.renderer.clone())));
+        self.update().await?;
+        self.manager.push_chunk_vertices(Arc::new(Mutex::new(self.renderer.clone()))).await?;
         self.renderer.render();
+        Ok(())
     } 
 
-    pub fn push_blocks(&mut self, blocks: Vec<([i32; 3], Box<dyn Block + Send + Sync>)>) -> Result<(), crate::manager::GameError> 
+    pub async fn push_blocks(&mut self, blocks: Vec<([i32; 3], Box<dyn Block<'static> + Send + Sync>)>) -> Result<(), crate::manager::GameError> 
     {
         for (i, block) in blocks {
-            self.manager.create(block, i)?
+            self.manager.create(block, i).await?
         }
         Ok(())
     }
