@@ -8,13 +8,18 @@ fn main() {
     let shader_status = Command::new("vulkan-sdk/1.4.350.1/x86_64/bin/slangc")
         .args([
             "src/rendering/shader.slang",
-            "-target", "spirv",
-            "-profile", "spirv_1_4",
+            "-target",
+            "spirv",
+            "-profile",
+            "spirv_1_4",
             "-emit-spirv-directly",
             "-fvk-use-entrypoint-name",
-            "-entry", "vertMain",
-            "-entry", "fragMain",
-            "-o", "src/rendering/slang.spv",
+            "-entry",
+            "vertMain",
+            "-entry",
+            "fragMain",
+            "-o",
+            "src/rendering/slang.spv",
         ])
         .status()
         .expect("Failed to run slangc — is the Vulkan SDK in place?");
@@ -37,7 +42,8 @@ fn main() {
         .file("src/rendering/vulkan.cpp")
         .file("src/rendering/vertex.cpp")
         .define("ENABLE_CPP20_MODULE", "1")
-        .flag("-Wall");
+        .flag("-Wall")
+        .opt_level(1);
 
     if is_release {
         build.define("NDEBUG", "1").opt_level(2);

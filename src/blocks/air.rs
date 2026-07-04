@@ -22,6 +22,6 @@ impl Block<'_> for Air {
         Ok(Box::new(AirProperties {}))
     }
     fn clone_box(&'_ self) -> Box<dyn Block<'_> + Send + Sync> {
-        Box::new(self.clone())
+        Box::new(*self)
     }
 }

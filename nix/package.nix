@@ -23,6 +23,7 @@ in
           (s + /src)
           (s + /Cargo.lock)
           (s + /Cargo.toml)
+          (s + /build.rs)
         ];
       };
 

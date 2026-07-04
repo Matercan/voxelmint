@@ -45,7 +45,7 @@ mkShell {
   ];
 
   shellHook = /* bash */ ''
-    cd ..
+    zsh
   '';
 
   VULKAN_PROTOCOLS_DIR = "${vulkan-headers}";

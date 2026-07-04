@@ -10,17 +10,18 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    #[must_use]
     pub fn new() -> Self {
         let app = unsafe { 
             let app = rendering::getApplication();
             rendering::initApplication(app); app
         };
-        return Self {
+        Self {
             app: Application(app),
         }
     }
 
-    pub fn push_vertices(&mut self, vertices: Vec<Vertex>, indices: Vec<u32>) {
+    pub fn push_vertices(&mut self, vertices: &[Vertex], indices: &[u32]) {
         unsafe { rendering::pushVertices(self.app.0, vertices.as_ptr(), vertices.len(), indices.as_ptr(), indices.len()) };
     }
 
@@ -33,8 +34,15 @@ impl Renderer {
     pub fn render(&mut self) {
         unsafe { rendering::tickApplication(self.app.0) };
     }
-
+    
+    #[must_use]
     pub fn borrow_app(&self) -> Arc<Application> {
         Arc::new(self.app)
+    }
+}
+
+impl Default for Renderer {
+    fn default() -> Self {
+        Self::new()
     }
 }

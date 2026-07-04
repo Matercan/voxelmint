@@ -1,4 +1,4 @@
-use std::ffi::{c_int};
+use std::ffi::c_int;
 use std::ptr;
 
 #[repr(C)]
@@ -19,7 +19,7 @@ pub struct ZipStat {
 pub struct ZipFile([u8; 0]);
 
 #[repr(C)]
-pub struct Zip ([u8; 0]);
+pub struct Zip([u8; 0]);
 
 unsafe extern "C" {
     fn zip_open(path: *const i8, flags: c_int, errorp: *mut c_int) -> *mut Zip;
@@ -57,21 +57,24 @@ pub struct TextureManager {
     tex_idx: u32,
 }
 
-
 unsafe fn zip_read_entry(zip: *mut Zip, idx: i64) -> Option<Vec<u8>> {
     let mut st = std::mem::MaybeUninit::<ZipStat>::uninit();
-    let ret = unsafe { zip_stat_index(zip, idx as u64, 0, st.as_mut_ptr()) };
+    let ret = unsafe { zip_stat_index(zip, idx.cast_unsigned(), 0, st.as_mut_ptr()) };
     if ret != 0 {
         return None;
     }
     let st = unsafe { st.assume_init() };
 
-    let zf = unsafe { zip_fopen_index(zip, idx as u64, 0) };
+    let zf = unsafe { zip_fopen_index(zip, idx.cast_unsigned(), 0) };
     if zf.is_null() {
         return None;
     }
 
-    let mut buf = vec![0u8; st.size as usize];
+    let mut buf = if let Ok(size) = usize::try_from(st.size) {
+        vec![0u8; size]
+    } else {
+        return None;
+    };
     let nread = unsafe { zip_fread(zf, buf.as_mut_ptr(), st.size) };
     unsafe { zip_fclose(zf) };
 
@@ -82,49 +85,56 @@ unsafe fn zip_read_entry(zip: *mut Zip, idx: i64) -> Option<Vec<u8>> {
     Some(buf)
 }
 
-
 impl TextureManager {
+    #[must_use]
     pub fn init() -> Option<Self> {
         let path = c"textures/out.zip";
         let mut zerr: c_int = 0;
         // 16 = ZIP_RDONLY
-        let zip = unsafe { zip_open(path.as_ptr(), 16, &mut zerr) };
+        let zip = unsafe { zip_open(path.as_ptr(), 16, &raw mut zerr) };
         if zip.is_null() {
             return None;
         }
-        Some(Self { zip, zip_idx: 0, tex_idx: 0 })
+        Some(Self {
+            zip,
+            zip_idx: 0,
+            tex_idx: 0,
+        })
     }
 
     pub fn deinit(&mut self) {
         unsafe { zip_close(self.zip) };
     }
 
+    #[must_use]
     pub fn texture_count(&self) -> i64 {
         unsafe { zip_get_num_entries(self.zip, 0) }
     }
 
+    #[must_use]
     pub fn texture_size(&self) -> [u8; 2] {
-        let data = match unsafe { zip_read_entry(self.zip, 0) } {
-            Some(d) => d,
-            None => return [0, 0],
+        let Some(data) = (unsafe { zip_read_entry(self.zip, 0) }) else {
+            return [0, 0];
         };
         Self::parse_dimensions_u8(&data).unwrap_or([0, 0])
     }
 
+    #[must_use]
     pub fn textures_size(&self) -> usize {
-        let total = self.texture_count() as usize;
+        let total = usize::try_from(self.texture_count()).unwrap_or_default();
         let mut current_count = 0usize;
 
         for i in 0..total {
-            let data = match unsafe { zip_read_entry(self.zip, i as i64) } {
-                Some(d) => d,
-                None => break,
+            let Ok(i) = i64::try_from(i) else {
+                break;
+            };
+            let Some(data) = (unsafe { zip_read_entry(self.zip, i) }) else {
+                break;
             };
             let mut pos = 0;
             while pos < data.len() {
-                let (width, height, next_pos) = match Self::parse_dim_at(&data, pos) {
-                    Some(v) => v,
-                    None => break,
+                let Some((width, height, next_pos)) = Self::parse_dim_at(&data, pos) else {
+                    break;
                 };
                 pos = next_pos;
                 current_count += width as usize * height as usize;
@@ -140,15 +150,18 @@ impl TextureManager {
         current_count * 4
     }
 
+    #[must_use]
     pub fn face_count(&self) -> usize {
-        let total = self.texture_count() as usize;
+        let total = usize::try_from(self.texture_count()).unwrap_or_default();
         let mut count = 0usize;
         let footer = b"\x00end\x00";
 
         for i in 0..total {
-            let data = match unsafe { zip_read_entry(self.zip, i as i64) } {
-                Some(d) => d,
-                None => break,
+            let Ok(i) = i64::try_from(i) else {
+                break;
+            };
+            let Some(data) = (unsafe { zip_read_entry(self.zip, i) }) else {
+                break;
             };
             let mut pos = 0;
             while let Some(png_end) = find_bytes(&data, pos, footer) {
@@ -161,13 +174,12 @@ impl TextureManager {
     }
 
     pub fn get_next_textures(&mut self) -> Vec<FaceTexture> {
-        let data = match unsafe { zip_read_entry(self.zip, self.zip_idx as i64) } {
-            Some(d) => d,
-            None => return Vec::new(),
+        let Some(data) = (unsafe { zip_read_entry(self.zip, i64::from(self.zip_idx)) }) else {
+            return Vec::new();
         };
 
         let mut st = std::mem::MaybeUninit::<ZipStat>::uninit();
-        unsafe { zip_stat_index(self.zip, self.zip_idx as u64, 0, st.as_mut_ptr()) };
+        unsafe { zip_stat_index(self.zip, u64::from(self.zip_idx), 0, st.as_mut_ptr()) };
         let base_texture = unsafe { st.assume_init() }.name;
 
         let mut textures = Vec::new();
@@ -176,9 +188,8 @@ impl TextureManager {
 
         while pos < data.len() {
             // Read "<WxH>\0"
-            let (mut width, mut height, next_pos) = match Self::parse_dim_at(&data, pos) {
-                Some(v) => v,
-                None => break,
+            let Some((mut width, mut height, next_pos)) = Self::parse_dim_at(&data, pos) else {
+                break;
             };
             pos = next_pos;
 
@@ -187,15 +198,13 @@ impl TextureManager {
                 Some(i) => pos + i,
                 None => break,
             };
-            let face_label = data[pos..label_end+1].to_vec().into_boxed_slice();
-            println!("Printing the face label: {:?}", face_label);
-            let label_ptr = Box::into_raw(face_label) as *mut u8;
+            let face_label = data[pos..=label_end].to_vec().into_boxed_slice();
+            let label_ptr = Box::into_raw(face_label).cast::<u8>();
             pos = label_end + 1;
 
             // Read PNG bytes until "\0end\0"
-            let png_end = match find_bytes(&data, pos, footer) {
-                Some(e) => e,
-                None => break,
+            let Some(png_end) = find_bytes(&data, pos, footer) else {
+                break;
             };
 
             let mut w: c_int = 0;
@@ -204,14 +213,17 @@ impl TextureManager {
             let png_bytes = unsafe {
                 stbi_load_from_memory(
                     data[pos..png_end].as_ptr(),
-                    (png_end - pos) as c_int,
-                    &mut w, &mut h, &mut ch, 4,
+                    c_int::try_from((png_end - pos).cast_signed()).unwrap_or_default(),
+                    &raw mut w,
+                    &raw mut h,
+                    &raw mut ch,
+                    4,
                 )
             };
 
-            if width as c_int != w || height as c_int != h {
-                width = w as u16;
-                height = h as u16;
+            if c_int::from(width) != w || c_int::from(height) != h {
+                width = u16::try_from(w).unwrap_or_default();
+                height = u16::try_from(h).unwrap_or_default();
             }
 
             textures.push(FaceTexture {
@@ -230,7 +242,6 @@ impl TextureManager {
         self.zip_idx += 1;
         textures
     }
-
 
     fn parse_dimensions_u8(data: &[u8]) -> Option<[u8; 2]> {
         let null_pos = data.iter().position(|&b| b == 0)?;
@@ -259,14 +270,12 @@ impl Drop for TextureManager {
     }
 }
 
-
 fn find_bytes(haystack: &[u8], start: usize, needle: &[u8]) -> Option<usize> {
     haystack[start..]
         .windows(needle.len())
         .position(|w| w == needle)
         .map(|i| start + i)
 }
-
 
 #[unsafe(no_mangle)]
 pub extern "C" fn getTexManager() -> *mut TextureManager {
@@ -276,32 +285,52 @@ pub extern "C" fn getTexManager() -> *mut TextureManager {
     }
 }
 
+/// Free's a provided texture manager.
+///
+/// # Safety
+/// Texture manager is a texture manager.
 #[unsafe(no_mangle)]
-pub extern "C" fn freeTexManager(mgr: *mut TextureManager) {
+pub unsafe extern "C" fn freeTexManager(mgr: *mut TextureManager) {
     if !mgr.is_null() {
         unsafe { drop(Box::from_raw(mgr)) };
     }
 }
 
+/// Gets the number of individual texture files the texture manager covers.
+///
+/// # Safety
+/// Texture manager is a texture manager.
 #[unsafe(no_mangle)]
-pub extern "C" fn getTextureCount(mgr: *mut TextureManager) -> i64 {
+pub unsafe extern "C" fn getTextureCount(mgr: *mut TextureManager) -> i64 {
     unsafe { (*mgr).texture_count() }
 }
 
+/// Gets the amount of individual faces in for every texture in the texture manager.
+///
+/// # Safety
+/// Texture manager is a texture manager.
 #[unsafe(no_mangle)]
-pub extern "C" fn getFaceCount(mgr: *mut TextureManager) -> usize {
+pub unsafe extern "C" fn getFaceCount(mgr: *mut TextureManager) -> usize {
     unsafe { (*mgr).face_count() }
 }
 
+/// Gets the amount of bits out of all the textures in the texture manager.
+///
+/// # Safety
+/// Texture manager is a texture manager.
 #[unsafe(no_mangle)]
-pub extern "C" fn getTexturesSize(mgr: *mut TextureManager) -> usize {
+pub unsafe extern "C" fn getTexturesSize(mgr: *mut TextureManager) -> usize {
     unsafe { (*mgr).textures_size() }
 }
 
+/// Gets the length and width of all the textures in the texture manager.
+///
+/// # Safety
+/// Texture manager is a texture manager.
 #[unsafe(no_mangle)]
-pub extern "C" fn getTextureSize(mgr: *mut TextureManager) -> *mut u32 {
+pub unsafe extern "C" fn getTextureSize(mgr: *mut TextureManager) -> *mut u32 {
     let size = unsafe { (*mgr).texture_size() };
-    let ptr = unsafe { libc::malloc(2 * std::mem::size_of::<u32>()) as *mut u32 };
+    let ptr = unsafe { libc::malloc(2 * std::mem::size_of::<u32>()).cast() };
     unsafe {
         *ptr = u32::from(size[0]);
         *ptr.add(1) = u32::from(size[1]);
@@ -309,17 +338,28 @@ pub extern "C" fn getTextureSize(mgr: *mut TextureManager) -> *mut u32 {
     ptr
 }
 
+/// Gets the next texture from the texture manager.
+///
+/// Returns nullptr if the amount of faces returned is none.
+///
+/// # Safety
+/// Texture manager is a texture manager.
 #[unsafe(no_mangle)]
-pub extern "C" fn getNextTextures(mgr: *mut TextureManager, len: *mut u8) -> *const FaceTexture {
+pub unsafe extern "C" fn getNextTextures(
+    mgr: *mut TextureManager,
+    len: *mut u8,
+) -> *const FaceTexture {
     let faces = unsafe { (*mgr).get_next_textures() };
     let count = faces.len();
-    unsafe { *len = count as u8 };
+    unsafe { *len = u8::try_from(count).unwrap_or_default() };
     if count == 0 {
         return ptr::null();
     }
     let ptr: *mut FaceTexture = unsafe { libc::malloc(count * size_of::<FaceTexture>()).cast() };
-    for i in 0..count {
-        unsafe { *ptr = faces[i]; }
+    for face in faces.iter().take(count) {
+        unsafe {
+            *ptr = *face;
+        }
     }
     ptr
 }

@@ -6,6 +6,7 @@ use crate::rendering::block::Vertex;
 #[derive(Clone, Copy)]
 pub struct Application(*mut c_void);
 impl Application {
+    #[must_use]
     pub fn get(&self) -> *const c_void {
         self.0.cast_const() 
     }

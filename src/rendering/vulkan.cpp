@@ -14,7 +14,6 @@
 #include <tuple>
 #include <mutex>
 #include <vector>
-#include <print>
 #include <unordered_map>
 
 #ifdef WINDOWS
@@ -148,8 +147,8 @@ constexpr uint32_t chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const& sur
 }
 
 static VKAPI_ATTR vk::Bool32 VKAPI_CALL
-debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT _, vk::DebugUtilsMessageTypeFlagsEXT type,
-              const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
+debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT, vk::DebugUtilsMessageTypeFlagsEXT type,
+              const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void*) {
   std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage
             << std::endl;
 
@@ -188,11 +187,6 @@ public:
   }
 
   uint32_t getTextureIndex(std::string name) {
-    std::println("Name provided: {}", name);
-    for (auto& pair : textureToIdx) {
-      std::println("Name: {}, Value: {}", pair.first, pair.second);
-    }
-
     auto faceValue = textureToIdx.find(name);
     if (faceValue == textureToIdx.end()) {
       std::string baseName =
@@ -391,10 +385,6 @@ private:
         vertices.clear();
         indices.clear();
         continue;
-      }
-
-      for (auto& vertex : job.vertices) {
-        std::println("texture: {}", vertex.texIndex);
       }
 
       vertices.insert(vertices.end(), job.vertices.begin(), job.vertices.end());
@@ -1388,8 +1378,8 @@ void setVertices(Application* app, Vertex* vertices, size_t vert_len, uint32_t* 
   app->pushVertices(std::move(verts), std::move(inds), true);
 }
 
-void pushVertices(Application* app, const Vertex* vertices, size_t vert_len, const uint32_t* indices,
-                  size_t ind_len) {
+void pushVertices(Application* app, const Vertex* vertices, size_t vert_len,
+                  const uint32_t* indices, size_t ind_len) {
   std::vector<Vertex>   verts(vertices, vertices + vert_len);
   std::vector<uint32_t> inds(indices, indices + ind_len);
   app->pushVertices(std::move(verts), std::move(inds), false);
