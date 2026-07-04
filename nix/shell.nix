@@ -13,9 +13,10 @@
   vulkan-headers,
   vulkan-tools,
   vulkan-loader,
+  vulkan-validation-layers,
+  shader-slang,
   glm,
   glfw3,
-  vulkan-validation-layers,
 }:
 
 mkShell {
@@ -40,6 +41,7 @@ mkShell {
     vulkan-validation-layers
     libzip
     wayland
+    shader-slang
     glm
     glfw3
   ];

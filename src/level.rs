@@ -58,19 +58,6 @@ impl Level {
     /// # Errors
     ///
     /// This code only errors if the manager could not find the chunk to create the block to.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// let mut level = Level::new();
-    ///
-    /// let blocks = vec![
-    ///     ([0, 0, 0], Box::new(TestBlock::new("dirt.gtex")) as Box<dyn Block + Send + Sync>),
-    ///     ([0, 1, 0], Box::new(TestBlock::new("grass.gtex")) as Box<dyn Block + Send + Sync>),
-    /// ];
-    ///
-    /// level.push_blocks(blocks).await?;
-    /// ```
     pub async fn push_blocks(
         &mut self,
         blocks: Vec<([i32; 3], Box<dyn Block<'static> + Send + Sync>)>,

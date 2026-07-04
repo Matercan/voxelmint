@@ -4,8 +4,7 @@ use std::process::Command;
 fn main() {
     let is_release = env::var("PROFILE").unwrap_or_default() == "release";
 
-    // Compile shaders
-    let shader_status = Command::new("vulkan-sdk/1.4.350.1/x86_64/bin/slangc")
+    let shader_status = Command::new("slangc")
         .args([
             "src/rendering/shader.slang",
             "-target",
@@ -26,13 +25,11 @@ fn main() {
 
     assert!(shader_status.success(), "Shader compilation failed");
 
-    // Rerun triggers
     println!("cargo:rerun-if-changed=src/rendering/shader.slang");
     println!("cargo:rerun-if-changed=src/rendering/vulkan.cpp");
     println!("cargo:rerun-if-changed=src/rendering/vertex.cpp");
     println!("cargo:rerun-if-changed=src/include/");
 
-    // C++ flags
     let mut build = cc::Build::new();
     build
         .cpp(true)
@@ -53,7 +50,6 @@ fn main() {
 
     build.compile("voxelmint_cpp");
 
-    // Link system libraries
     println!("cargo:rustc-link-lib=vulkan");
     println!("cargo:rustc-link-lib=wayland-client");
     println!("cargo:rustc-link-lib=glfw");
