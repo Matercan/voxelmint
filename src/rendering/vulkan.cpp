@@ -846,10 +846,13 @@ private:
     stagingBufferMemory.unmapMemory();
     freeTexManager(textures);
 
+    /* transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eTransferDstOptimal,
+                          vk::ImageLayout::eShaderReadOnlyOptimal, faceCount, mipLevels); */
+    endSingleTimeCommandBuffer(std::move(commandBuffer));
+
+    commandBuffer = beginSingleTimeCommandBuffer();
     generateMipmaps(commandBuffer, textureImage, vk::Format::eR8G8B8A8Srgb, textureSize[0],
                     textureSize[1], textureCount, mipLevels);
-    transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eTransferDstOptimal,
-                          vk::ImageLayout::eShaderReadOnlyOptimal, faceCount, mipLevels);
     endSingleTimeCommandBuffer(std::move(commandBuffer));
 
     std::free(textureSize);
